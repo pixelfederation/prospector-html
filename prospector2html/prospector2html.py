@@ -93,7 +93,7 @@ class Prospector2HTML:
                     return ["minimized js..."]
                 line_numbers = []
                 for idx, l in enumerate(lines):
-                    line_numbers.append(f"{idx+line_n1} {l}")
+                    line_numbers.append(f"{idx+line_n+1} {l}")
                 return line_numbers
 
         result = []
