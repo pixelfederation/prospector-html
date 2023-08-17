@@ -83,15 +83,18 @@ class Prospector2HTML:
             try:
                 print(f"trying file {path}, line: {line}")
                 with open(path, 'r') as fp:
-                    line = line-1 if line > 1 else line
-                    lines = fp.readlines()[line:line+11]
+                    line_n = line-1 if line > 1 else line
+                    lines = fp.readlines()[line_n:line_n+11]
             except Exception as e:
                 print(str(e))
                 return []
             else:
                 if path.endswith('.js') and len(lines) > 0 and any(len(l) > 200 for l in lines):
                     return ["minimized js..."]
-                return lines
+                line_numbers = []
+                for idx, l in enumerate(lines):
+                    line_numbers.append(f"{idx+line_n1} {l}")
+                return line_numbers
 
         result = []
         url = args.repository_url.rstrip("/")
