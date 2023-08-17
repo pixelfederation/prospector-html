@@ -76,29 +76,46 @@ class Prospector2HTML:
         return result
 
 
-    def normalize_semgrep(self, x):
+
+    def normalize_semgrep(self, args, x):
+        def readSnippet(path, line):
+            lines = []
+            try:
+                print(f"trying file {path}, line: {line}")
+                with open(path, 'r') as fp:
+                    line = line-1 if line > 1 else line
+                    lines = fp.readlines()[line:line+11]
+            except Exception as e:
+                print(str(e))
+                return []
+            else:
+                if path.endswith('.js') and len(lines) > 0 and any(len(l) > 200 for l in lines):
+                    return ["minimized js..."]
+                return lines
+
         result = []
+        url = args.repository_url.rstrip("/")
         for item in x:
+            code = readSnippet(item["path"],item['start']['line'])
+            #print(code)
+            #print("<pre>" + ''.join(code) + "</pre>")
             try:
                 result.append({
-                    'tool': 'semgrep',
                     'code': item['check_id'],
-                    'severity': item['extra']['severity'],
-                    'confidence': item['extra']['metadata']['confidence'],
-                    'function': 'unknown',
-                    'file': item['path'],
+                    'severity  / confidence': f"<span class='red'>{item['extra']['severity']}</span> / {item['extra']['metadata']['confidence']}",
+                    'file': f"<a target=\"_blank\" href=\"{url}/blob/{args.sha}/{item['path']}#L{item['start']['line']}\">{item['path']}</a>",
+                    'pos': item['start']['col'],
                     'line': item['start']['line'],
-                    'position': item['start']['col'],
-                    'message': item['extra']['message']
+                    'message': item['extra']['message'],
+                    'snippet': "<pre><code>" + ''.join(code) + "</code></pre>"
                 })
             except KeyError as e:
                 print("ERROR: Can't normalize semgrep item: ", str(e), " is absent.")
 
         return result
 
-
     def get_report_body(self, obj):
-        return json2html.convert(json=obj, table_attributes="id=\"info-table\" class=\"table table-bordered table-hover\"")
+        return json2html.convert(json=obj, escape=False, table_attributes="id=\"info-table\" class=\"table table-bordered table-hover\"")
 
 
     def main(self):
@@ -115,6 +132,10 @@ class Prospector2HTML:
                             help="Always exit with zero return code.")
         parser.add_argument('-f', '--filter', help='apply tool filter for input JSON', required=False,
                             default='prospector', choices = ['none', 'prospector', 'semgrep', 'gitlab-sast'])
+        parser.add_argument('-l', '--repository-url', help='repository url', required=False,
+                            default='https://github.com', action='store', type=str, dest='repository_url' )
+        parser.add_argument('-s', '--sha', help='sha, branch, or tag', required=False, action='store',
+                            type=str, dest='sha')
 
         args = parser.parse_args()
 
@@ -147,6 +168,10 @@ class Prospector2HTML:
             # filter == none - left for future
             pass
 
+        if args.repository_url and not args.sha:
+            print("Missing sha argument")
+            return 1
+
         deduplicated_msgs = []
         for msg in msgs:
             if msg not in deduplicated_msgs:
@@ -155,7 +180,7 @@ class Prospector2HTML:
         if args.filter == 'gitlab-sast':
             deduplicated_msgs = self.normalize_gitlab_sast(deduplicated_msgs)
         elif args.filter == 'semgrep':
-            deduplicated_msgs = self.normalize_semgrep(deduplicated_msgs)
+            deduplicated_msgs = self.normalize_semgrep(args, deduplicated_msgs)
         elif args.filter == 'prospector':
             deduplicated_msgs = self.normalize_prospector(deduplicated_msgs)
         else:
@@ -211,7 +236,12 @@ class Prospector2HTML:
             <html>
                 <head>
                     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap.min.css">
-                    <style>body{ margin:0 100; background:whitesmoke; }</style>
+                    <style>body{ margin:0; background:whitesmoke; }</style>
+                    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/default.min.css">
+                    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+
+                    <style>code {width: 600px } td:nth-child(6),td:nth-child(1) { font-size: 10pt} .red {color: red}</style>
+                    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/go.min.js"></script>
                 </head>
 <!-- 
 ''' + json.dumps({ 'meta': meta_info }, indent=2, sort_keys=True) + '''
@@ -219,6 +249,7 @@ class Prospector2HTML:
                 <body>
             ''' + self.get_report_body(filtered_msgs) + '''
                 </body>
+                <script>hljs.highlightAll();</script>
             </html>'''
 
         report_file = args.output
