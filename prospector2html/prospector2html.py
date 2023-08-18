@@ -109,7 +109,7 @@ class Prospector2HTML:
             try:
                 result.append({
                     'code': item['check_id'],
-                    'severity  / confidence': f"<span class='red'>{item['extra']['severity']}</span> / {item['extra']['metadata']['confidence']}",
+                    'impact / severity  / confidence': f"<span class='red'>{item['extra']['metadata']['impact']}</span> / {item['extra']['severity']} / {item['extra']['metadata']['confidence']}",
                     'file': f"<a target=\"_blank\" href=\"{url}/blob/{args.sha}/{item['path']}#L{item['start']['line']}\">{item['path']}</a>",
                     'pos': item['start']['col'],
                     'line': item['start']['line'],
