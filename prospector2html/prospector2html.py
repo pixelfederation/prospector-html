@@ -8,6 +8,7 @@ from datetime import datetime
 import argparse
 import json
 import yaml
+import pathlib
 from json2html import *
 
 class Prospector2HTML:
@@ -100,8 +101,11 @@ class Prospector2HTML:
         url = args.repository_url.rstrip("/")
         for item in x:
             code = readSnippet(item["path"],item['start']['line'])
-            #print(code)
-            #print("<pre>" + ''.join(code) + "</pre>")
+
+            ext = pathlib.Path(item["path"]).suffix.lstrip(".")
+            html_class = ""
+            if ext in ["php", "js", "yaml", "java", "html" ]:
+                html_class = f"language-{ext}"
             try:
                 result.append({
                     'code': item['check_id'],
@@ -110,7 +114,7 @@ class Prospector2HTML:
                     'pos': item['start']['col'],
                     'line': item['start']['line'],
                     'message': item['extra']['message'],
-                    'snippet': "<pre><code>" + ''.join(code) + "</code></pre>"
+                    'snippet': f"<pre><code class=\"{html_class}\">" + ''.join(code) + "</code></pre>"
                 })
             except KeyError as e:
                 print("ERROR: Can't normalize semgrep item: ", str(e), " is absent.")
