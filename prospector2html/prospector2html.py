@@ -84,8 +84,9 @@ class Prospector2HTML:
             try:
                 print(f"trying file {path}, line: {line}")
                 with open(path, 'r') as fp:
-                    line_n = line-1 if line > 1 else line
-                    lines = fp.readlines()[line_n:line_n+11]
+                    line_n = line-5 if line > 5 else line
+                    lines = fp.readlines()
+                    lines = lines[line_n:line_n+11]
             except Exception as e:
                 print(str(e))
                 return []
@@ -101,6 +102,11 @@ class Prospector2HTML:
         url = args.repository_url.rstrip("/")
         for item in x:
             code = readSnippet(item["path"],item['start']['line'])
+            impact = item['extra']['metadata']['impact']
+            severity = item['extra']['severity']
+            confidence = item['extra']['metadata']['confidence']
+            start_line = item['start']['line']
+
 
             ext = pathlib.Path(item["path"]).suffix.lstrip(".")
             html_class = ""
@@ -109,10 +115,10 @@ class Prospector2HTML:
             try:
                 result.append({
                     'code': item['check_id'],
-                    'impact / severity  / confidence': f"<span class='red'>{item['extra']['metadata']['impact']}</span> / {item['extra']['severity']} / {item['extra']['metadata']['confidence']}",
-                    'file': f"<a target=\"_blank\" href=\"{url}/blob/{args.sha}/{item['path']}#L{item['start']['line']}\">{item['path']}</a>",
+                    'impact / severity  / confidence': f"<div class=\"data\" data-impact=\"{impact}\" data-severity=\"{severity}\"><span class='red'>{impact}</span> / {severity} / {confidence}</div>",
+                    'file': f"<a target=\"_blank\" href=\"{url}/blob/{args.sha}/{item['path']}#L{start_line}\">{item['path']}</a>",
                     'pos': item['start']['col'],
-                    'line': item['start']['line'],
+                    'line': start_line,
                     'message': item['extra']['message'],
                     'snippet': f"<pre><code class=\"{html_class}\">" + ''.join(code) + "</code></pre>"
                 })
@@ -247,16 +253,106 @@ class Prospector2HTML:
                     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/default.min.css">
                     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
 
-                    <style>code {width: 600px } td:nth-child(6),td:nth-child(1) { font-size: 10pt} .red {color: red}</style>
+                    <style>
+                        code {
+                            width: 600px;
+                        }
+                        td:nth-child(6),td:nth-child(1) {
+                            font-size: 10pt;
+                        }
+                        .red {
+                            color: red;
+                        }
+                        .none {
+                            display: none;
+                        }
+                        .controls {
+                            text-align: center;
+                            font-size: 1.5em;
+                        }
+                    </style>
                     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/go.min.js"></script>
+                    <script>
+                    function main() {
+                        function selectFilter(ev) {
+                            let table = document.getElementsByTagName("table")[0];
+                            let severitySelect = document.getElementById("severity");
+                            let impactSelect = document.getElementById("impact");
+                            let severity = severitySelect.value.toUpperCase();
+                            let impact = impactSelect.value.toUpperCase();
+                            tr = table.getElementsByTagName("tr");
+                            for (i = 0; i < tr.length; i++) {
+                                let div = tr[i].getElementsByClassName("data")[0];
+                                if ( ! div) {
+                                    continue;
+                                }
+                                //console.log("here dataset seve", div.dataset.severity.toUpperCase(), "dataset impa", div.dataset.impact.toUpperCase(), "seve", severity, "impact", impact );
+                                if ( ( div.dataset.severity.toUpperCase() != severity && severity != "ALL" ) || ( div.dataset.impact.toUpperCase() != impact && impact != "ALL" ) ) {
+                                    if ( ! tr[i].classList.contains("none") ) {
+                                        //console.log("adding add 'none'");
+                                        tr[i].classList.add("none");
+                                    }
+                                } else {
+                                    tr[i].classList.remove("none");
+                                }
+                            }
+                        }
+
+                        function filterText(ev) {
+                                var input, filter, tr, txtValue;
+                                input = document.getElementById("text_filter");
+                                filter = input.value.toUpperCase();
+                                let table = document.getElementsByTagName("table")[0];
+                                tr = table.getElementsByTagName("tr");
+                                for (let i = 0; i < tr.length; i++) {
+                                    let td = tr[i].getElementsByTagName("td");
+                                    let txt = []
+                                    for (let td_idx = 0; td_idx < td.length; td_idx++) {
+                                        let t = td[td_idx];
+                                        console.log("HERE", t);
+                                        if (!t) return;
+                                        txtValue = t.textContent || t.innerText;
+                                        txt.push(txtValue.toUpperCase())
+                                    }
+                                    if (txt.some( (t) => t.includes(filter)) ) {
+                                        tr[i].classList.remove("none");
+                                    } else {
+                                        tr[i].classList.add("none");
+                                    }
+                                }
+                        }
+                        document.getElementById("text_filter").addEventListener("keyup", filterText);
+                        document.getElementById("impact").addEventListener("change", selectFilter);
+                        document.getElementById("severity").addEventListener("change", selectFilter);
+                        selectFilter();
+                    }
+                    </script
                 </head>
 <!-- 
 ''' + json.dumps({ 'meta': meta_info }, indent=2, sort_keys=True) + '''
 -->
                 <body>
+                <div class="controls">
+                <input type="text" id="text_filter" placeholder="Search..." title="Type in a name">
+                <select name="impact" id="impact">
+                    <option value="all" selected="selected" >All</option>
+                    <option value="high" >High</option>
+                    <option value="warning">Warning</option>
+                    <option value="low">Low</option>
+                </select>
+                <select name="severity" id="severity">
+                    <option value="all" selected="selected" >All</option>
+                    <option value="error">Error</option>
+                    <option value="high" >High</option>
+                    <option value="warning">Warning</option>
+                    <option value="low">Low</option>
+                </select>
+                </div>
             ''' + self.get_report_body(filtered_msgs) + '''
                 </body>
-                <script>hljs.highlightAll();</script>
+                <script>hljs.highlightAll();
+                document.addEventListener('DOMContentLoaded', (event) => { main() })
+                </script>
             </html>'''
 
         report_file = args.output
