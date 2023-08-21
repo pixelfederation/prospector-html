@@ -269,6 +269,10 @@ class Prospector2HTML:
                         .controls {
                             text-align: center;
                             font-size: 1.5em;
+                            padding: 15px;
+                        }
+                        .controls span {
+                            padding-left: 20px;
                         }
                     </style>
                     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/go.min.js"></script>
@@ -334,12 +338,14 @@ class Prospector2HTML:
                 <body>
                 <div class="controls">
                 <input type="text" id="text_filter" placeholder="Search..." title="Type in a name">
+                <span>IMPACT</span>
                 <select name="impact" id="impact">
                     <option value="all" selected="selected" >All</option>
                     <option value="high" >High</option>
                     <option value="warning">Warning</option>
                     <option value="low">Low</option>
                 </select>
+                <span>SEVERITY</span>
                 <select name="severity" id="severity">
                     <option value="all" selected="selected" >All</option>
                     <option value="error">Error</option>
