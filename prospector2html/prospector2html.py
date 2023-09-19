@@ -119,7 +119,9 @@ class Prospector2HTML:
             try:
                 result.append({
                     'code': item['check_id'],
-                    'impact / severity  / confidence': f"<div class=\"data\" data-impact=\"{impact}\" data-severity=\"{severity}\"><span class='red'>{impact}</span> / {severity} / {confidence}</div>",
+                    'impact / severity / confidence': f"<div class=\"data\" data-impact=\"{impact}\" data-severity=\"{severity}\"><span class='red'>{impact}</span> / {severity} / {confidence}</div>",
+                    'impact_weight': 1 if impact == "LOW" else 2 if impact == "MEDIUM" else 3 if impact == "HIGH" else 0,
+                    'severity_weight': 1 if severity == "LOW" else 2 if severity == "WARNING" else 3 if severity == "HIGH" else 4 if severity == "ERROR" else 0,
                     'file': f"<a target=\"_blank\" href=\"{url}/blob/{args.sha}/{item['path']}#L{start_line}\">{item['path']}</a>",
                     'pos': item['start']['col'],
                     'line': start_line,
@@ -130,6 +132,7 @@ class Prospector2HTML:
                 print("ERROR: Can't normalize semgrep item: ", str(e), " is absent.")
 
         return result
+
 
     def get_report_body(self, obj):
         return json2html.convert(json=obj, escape=False, table_attributes="id=\"info-table\" class=\"table table-bordered table-hover\"")
@@ -205,7 +208,30 @@ class Prospector2HTML:
             pass
 
         filtered_msgs = list(filter(self.filter_message, deduplicated_msgs))
-        filtered_msgs.sort(key=lambda x: (x['file'], x['line']))
+        filtered_msgs.sort(key=lambda x: (x['impact_weight'], x['line']), reverse=True)
+
+        # remove columns
+        rem_list = ["impact_weight", "severity_weight"]
+        for key in rem_list:
+            for msg in filtered_msgs:
+                msg.pop(key)
+
+        # count impact msgs
+        impact_levels = ["HIGH", "MEDIUM", "LOW"]
+        filtered_msgs_impact_count = {}
+        for i in impact_levels:
+            search_string = 'data-impact="' + i + '"'
+            impact_count = len(list(filter(lambda x: search_string in x, [sub['impact / severity / confidence'] for sub in filtered_msgs])))
+            filtered_msgs_impact_count[i] = impact_count
+
+        # count severity msgs
+        severity_levels = ["ERROR", "HIGH", "WARNING", "LOW"]
+        filtered_msgs_severity_count = {}
+        for i in severity_levels:
+            search_string = 'data-severity="' + i + '"'
+            severity_count = len(list(filter(lambda x: search_string in x, [sub['impact / severity / confidence'] for sub in filtered_msgs])))
+            filtered_msgs_severity_count[i] = severity_count
+
 
         meta_info = {
             'report_date': str(datetime.now()),
@@ -267,16 +293,34 @@ class Prospector2HTML:
                         .red {
                             color: red;
                         }
+                        .green {
+                            color: green;
+                        }
+                        .orange {
+                            color: #FF9900;
+                        }
+                        .magenta {
+                            color: #CC338B;
+                        }
                         .none {
                             display: none;
                         }
+                        .bold {
+                            font-weight: bold;
+                        }
                         .controls {
-                            text-align: center;
                             font-size: 1.5em;
                             padding: 15px;
+                            display: flex;
                         }
-                        .controls span {
-                            padding-left: 20px;
+                        .left {
+                            text-align: left;
+                        }
+                        .right {
+                            text-align: right;
+                        }
+                        .column {
+                            flex: 50%;
                         }
                     </style>
                     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/go.min.js"></script>
@@ -341,12 +385,25 @@ class Prospector2HTML:
 -->
                 <body>
                 <div class="controls">
+                <div class="column left">
+                <span class="bold">IMPACT</span>
+                <span class="red">HIGH: <span class="bold">''' + str(filtered_msgs_impact_count['HIGH']) + '''</span></span>
+                <span class="orange">MEDIUM: <span class="bold">''' + str(filtered_msgs_impact_count['MEDIUM']) + '''</span></span>
+                <span class="green">LOW: <span class="bold">''' + str(filtered_msgs_impact_count['LOW']) + '''</span></span>
+                <span> | </span>
+                <span class="bold">SEVERITY</span>
+                <span class="magenta">ERROR: <span class="bold">''' + str(filtered_msgs_severity_count['ERROR']) + '''</span></span>
+                <span class="red">HIGH: <span class="bold">''' + str(filtered_msgs_severity_count['HIGH']) + '''</span></span>
+                <span class="orange">WARNING: <span class="bold">''' + str(filtered_msgs_severity_count['WARNING']) + '''</span></span>
+                <span class="green">LOW: <span class="bold">''' + str(filtered_msgs_severity_count['LOW']) + '''</span></span>
+                </div>
+                <div class="column right">
                 <input type="text" id="text_filter" placeholder="Search..." title="Type in a name">
                 <span>IMPACT</span>
                 <select name="impact" id="impact">
                     <option value="all" selected="selected" >All</option>
                     <option value="high" >High</option>
-                    <option value="warning">Warning</option>
+                    <option value="medium">Medium</option>
                     <option value="low">Low</option>
                 </select>
                 <span>SEVERITY</span>
@@ -357,6 +414,7 @@ class Prospector2HTML:
                     <option value="warning">Warning</option>
                     <option value="low">Low</option>
                 </select>
+                </div>
                 </div>
             ''' + self.get_report_body(filtered_msgs) + '''
                 </body>
