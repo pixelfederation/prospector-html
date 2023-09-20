@@ -207,6 +207,7 @@ class Prospector2HTML:
             # filter == none - left for future
             pass
 
+        repository_name = args.repository_url.rsplit("/", 1)[-1]
         filtered_msgs = list(filter(self.filter_message, deduplicated_msgs))
         filtered_msgs.sort(key=lambda x: (x['impact_weight'], x['line']), reverse=True)
 
@@ -384,6 +385,9 @@ class Prospector2HTML:
 ''' + json.dumps({ 'meta': meta_info }, indent=2, sort_keys=True) + '''
 -->
                 <body>
+                <div class="controls left">
+                <span class="bold">Repository: ''' + str(repository_name) + '''</span>
+                </div>
                 <div class="controls">
                 <div class="column left">
                 <span class="bold">IMPACT</span>
