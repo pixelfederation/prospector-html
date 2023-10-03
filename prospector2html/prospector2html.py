@@ -118,15 +118,13 @@ class Prospector2HTML:
                 code = html.escape(code)
             try:
                 result.append({
-                    'code': item['check_id'],
-                    'impact / severity / confidence': f"<div class=\"data\" data-impact=\"{impact}\" data-severity=\"{severity}\"><span class='red'>{impact}</span> / {severity} / {confidence}</div>",
-                    'impact_weight': 1 if impact == "LOW" else 2 if impact == "MEDIUM" else 3 if impact == "HIGH" else 0,
-                    'severity_weight': 1 if severity == "LOW" else 2 if severity == "WARNING" else 3 if severity == "HIGH" else 4 if severity == "ERROR" else 0,
-                    'file': f"<a target=\"_blank\" href=\"{url}/blob/{args.sha}/{item['path']}#L{start_line}\">{item['path']}</a>",
-                    'pos': item['start']['col'],
-                    'line': start_line,
+                    'code': ' . '.join(item['check_id'].split('.')),
+                    'impact': f"<div class=\"data\" data-impact=\"{impact}\"><span class=\"badge\">{impact}</span></div>",
+                    'severity': f"<div class=\"data\" data-severity=\"{severity}\"><span class=\"badge\">{severity}</span></div>",
+                    'confidence': f"<div class=\"data\" data-confidence=\"{confidence}\" ><span class=\"badge \">{confidence}</span></div>",
+                    'file': f"<a target=\"_blank\" href=\"{url}/blob/{args.sha}/{item['path']}#L{start_line}\">{' / '.join(item['path'].split('/'))}</a>",
                     'message': item['extra']['message'],
-                    'snippet': f"<pre><code class=\"{html_class}\">" + code + "</code></pre>"
+                    'snippet': f"<pre>line: {start_line}, pos: {item['start']['col']} <code class=\"{html_class}\">" + code + "</code></pre>"
                 })
             except KeyError as e:
                 print("ERROR: Can't normalize semgrep item: ", str(e), " is absent.")
@@ -135,7 +133,7 @@ class Prospector2HTML:
 
 
     def get_report_body(self, obj):
-        return json2html.convert(json=obj, escape=False, table_attributes="id=\"info-table\" class=\"table table-bordered table-hover\"")
+        return json2html.convert(json=obj, escape=False, table_attributes="id=\"info-table\" class=\"table table-striped table-bordered table-hover\"")
 
 
     def main(self):
@@ -209,30 +207,6 @@ class Prospector2HTML:
 
         repository_name = args.repository_url.rsplit("/", 1)[-1]
         filtered_msgs = list(filter(self.filter_message, deduplicated_msgs))
-        filtered_msgs.sort(key=lambda x: (x['impact_weight'], x['line']), reverse=True)
-
-        # remove columns
-        rem_list = ["impact_weight", "severity_weight"]
-        for key in rem_list:
-            for msg in filtered_msgs:
-                msg.pop(key)
-
-        # count impact msgs
-        impact_levels = ["HIGH", "MEDIUM", "LOW"]
-        filtered_msgs_impact_count = {}
-        for i in impact_levels:
-            search_string = 'data-impact="' + i + '"'
-            impact_count = len(list(filter(lambda x: search_string in x, [sub['impact / severity / confidence'] for sub in filtered_msgs])))
-            filtered_msgs_impact_count[i] = impact_count
-
-        # count severity msgs
-        severity_levels = ["ERROR", "HIGH", "WARNING", "LOW"]
-        filtered_msgs_severity_count = {}
-        for i in severity_levels:
-            search_string = 'data-severity="' + i + '"'
-            severity_count = len(list(filter(lambda x: search_string in x, [sub['impact / severity / confidence'] for sub in filtered_msgs])))
-            filtered_msgs_severity_count[i] = severity_count
-
 
         meta_info = {
             'report_date': str(datetime.now()),
@@ -264,8 +238,6 @@ class Prospector2HTML:
             'pipeline_project_group': os.environ.get('CI_PROJECT_NAMESPACE', None),
             'pipeline_project_url': os.environ.get('CI_PROJECT_URL', None),
             'pipeline_server_url': os.environ.get('CI_SERVER_URL', None),
-            'filtered_message_count': len(deduplicated_msgs),
-            'total_message_count': len(filtered_msgs)
         }
 
         report_string = ''
@@ -277,22 +249,47 @@ class Prospector2HTML:
             report_string = json.dumps(report_content, indent=2, sort_keys=True)
         else:
             report_string = '''
-            <html>
+            <!doctype html>
+            <html lang="en">
                 <head>
-                    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap.min.css">
-                    <style>body{ margin:0; background:whitesmoke; }</style>
                     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/default.min.css">
                     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
-
+                    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+                    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+                    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
                     <style>
-                        code {
-                            width: 600px;
+                        body{ margin:0; background:whitesmoke; }
+                        table {
+                            table-layout: fixed;
+                            border-collapse: collapse;
+                            width: 100%;
                         }
-                        td:nth-child(6),td:nth-child(1) {
-                            font-size: 10pt;
+
+                        code {
+                            min-width: 600px;
+                        }
+                        #info-table th:nth-child(2), #info-table th:nth-child(3), #info-table th:nth-child(4), #info-table td:nth-child(2), #info-table td:nth-child(3), #info-table td:nth-child(4) {
+                            width: 100px;
+                        }
+                        #info-table  th:nth-child(1), #info-table td:nth-child(1) {
+                            width: 200px;
+                        }
+                        #info-table th:nth-child(5), #info-table td:nth-child(5) {
+                            width: 200px;
+                        }
+                        #info-table th:nth-child(6), #info-table td:nth-child(6) {
+                            width: 300px;
+                        }
+                        #info-table td {
+                            overflow: hidden;
+                            text-overflow: ellipsis;
+                            word-wrap: break-word;
                         }
                         .red {
                             color: red;
+                        }
+                        .red-bg {
+                        background-color: #fa5858;
                         }
                         .green {
                             color: green;
@@ -310,60 +307,41 @@ class Prospector2HTML:
                             font-weight: bold;
                         }
                         .controls {
-                            font-size: 1.5em;
-                            padding: 15px;
-                            display: flex;
+                            margin: 20px 0px 20px 20px;
+                            box-shadow: 3px 3px 10px #686060;
+                            font-size: 1.2em;
+                            padding: 20px 20px 20px 25px;
+                            background-color: #e8e6e6;
                         }
-                        .left {
-                            text-align: left;
+                        .filters {
+                            line-height: 5em;
                         }
-                        .right {
-                            text-align: right;
+                        table#summary {
+                            width: 45%;
                         }
-                        .column {
-                            flex: 50%;
+                        .container-fluid > h2 {
+                            margin: 20px 20px 20px 20px;
                         }
                     </style>
                     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/go.min.js"></script>
                     <script>
                     function main() {
-                        function selectFilter(ev) {
-                            let table = document.getElementsByTagName("table")[0];
-                            let severitySelect = document.getElementById("severity");
-                            let impactSelect = document.getElementById("impact");
-                            let severity = severitySelect.value.toUpperCase();
-                            let impact = impactSelect.value.toUpperCase();
-                            tr = table.getElementsByTagName("tr");
-                            for (i = 0; i < tr.length; i++) {
-                                let div = tr[i].getElementsByClassName("data")[0];
-                                if ( ! div) {
-                                    continue;
-                                }
-                                //console.log("here dataset seve", div.dataset.severity.toUpperCase(), "dataset impa", div.dataset.impact.toUpperCase(), "seve", severity, "impact", impact );
-                                if ( ( div.dataset.severity.toUpperCase() != severity && severity != "ALL" ) || ( div.dataset.impact.toUpperCase() != impact && impact != "ALL" ) ) {
-                                    if ( ! tr[i].classList.contains("none") ) {
-                                        //console.log("adding add 'none'");
-                                        tr[i].classList.add("none");
-                                    }
-                                } else {
-                                    tr[i].classList.remove("none");
-                                }
-                            }
-                        }
 
                         function filterText(ev) {
+                                filterCheckboxes();
                                 var input, filter, tr, txtValue;
                                 input = document.getElementById("text_filter");
                                 filter = input.value.toUpperCase();
-                                let table = document.getElementsByTagName("table")[0];
+                                let table = document.getElementById("info-table");
                                 tr = table.getElementsByTagName("tr");
                                 for (let i = 0; i < tr.length; i++) {
                                     let td = tr[i].getElementsByTagName("td");
+                                    if (td.length == 0) {
+                                        continue;
+                                    }
                                     let txt = []
                                     for (let td_idx = 0; td_idx < td.length; td_idx++) {
                                         let t = td[td_idx];
-                                        console.log("HERE", t);
-                                        if (!t) return;
                                         txtValue = t.textContent || t.innerText;
                                         txt.push(txtValue.toUpperCase())
                                     }
@@ -374,50 +352,187 @@ class Prospector2HTML:
                                     }
                                 }
                         }
+
+                        function filterCheckboxes() {
+                            let severities = [];
+                            let impacts = [];
+                            $("#filters .severity").each(function(idx) {
+                                if (this.checked) {
+                                    severities.push(this.value.toUpperCase())
+                                }
+                            })
+                            $("#filters .impact").each(function(idx) {
+                                if (this.checked) {
+                                    impacts.push(this.value.toUpperCase())
+                                }
+                            })
+
+                            let table = document.getElementById("info-table");
+                            tr = table.getElementsByTagName("tr");
+                            for (i = 1; i < tr.length; i++) {
+                                let div
+                                let impact
+                                let severity
+                                div = tr[i].getElementsByClassName("data")[0];
+                                if ( ! div) {
+                                    continue;
+                                }
+                                impact = div.dataset.impact.toUpperCase()
+                                div = tr[i].getElementsByClassName("data")[1];
+                                if ( ! div) {
+                                    continue;
+                                }
+                                severity = div.dataset.severity.toUpperCase()
+
+                                if ( ! severities.includes(severity) || ! impacts.includes(impact) ) {
+                                    if ( ! tr[i].classList.contains("none") ) {
+                                        //console.log("adding add 'none'");
+                                        tr[i].classList.add("none");
+                                    }
+                                } else {
+                                    tr[i].classList.remove("none");
+                                }
+                            }
+                        }
+                        function formChanged(ev){
+                            try {
+                                let value = ev.target.value;
+                                let type = ev.target.dataset.checkbox;
+
+                                if ( typeof value !== "undefined" && typeof type !== "undefined") {
+                                    filterCheckboxes();
+                                }
+
+                            } catch(e){
+                                //console.log(e)
+                            }
+
+                        }
+
+                        badgeMap = { "HIGH": "badge-danger","ERROR": "badge-danger",  "MEDIUM": "badge-warning", "WARNING": "badge-warning", "LOW": "badge-info"}
+
+                        function initCount() {
+                            impacts = []
+                            severities = []
+                            let table = document.getElementById("info-table");
+                            tr = table.getElementsByTagName("tr");
+                            for (i = 1; i < tr.length; i++) {
+                                let div
+                                let impact
+                                let severity
+                                let span
+                                div = tr[i].getElementsByClassName("data")[0];
+                                if ( ! div) {
+                                    continue;
+                                }
+                                impact = div.dataset.impact.toUpperCase();
+                                span = div.getElementsByClassName("badge")[0]
+                                span.classList.add(badgeMap[impact]);
+                                div = tr[i].getElementsByClassName("data")[1];
+                                if ( ! div) {
+                                    continue;
+                                }
+                                severity = div.dataset.severity.toUpperCase();
+                                span = div.getElementsByClassName("badge")[0]
+                                span.classList.add(badgeMap[severity]);
+                                impacts.push(impact);
+                                severities.push(severity);
+
+                                div = tr[i].getElementsByClassName("data")[2];
+                                confidence = div.dataset.confidence.toUpperCase();
+                                span = div.getElementsByClassName("badge")[0]
+                                span.classList.add(badgeMap[confidence]);
+                            }
+                            var severityMap = severities.reduce(function(prev, cur) {
+                                prev[cur] = (prev[cur] || 0) + 1;
+                                return prev;
+                                }, {});
+                            var impactMap = impacts.reduce(function(prev, cur) {
+                                prev[cur] = (prev[cur] || 0) + 1;
+                                return prev;
+                                }, {});
+
+                            for (var key in impactMap) {
+                                if (impactMap.hasOwnProperty(key)) {
+                                    //console.log(key, impactMap[key]);
+                                    $("#impact-" + key.toLowerCase() + "-sum").html(impactMap[key])
+                                }
+                            }
+                            for (var key in severityMap) {
+                                if (severityMap.hasOwnProperty(key)) {
+                                    $("#severity-" + key.toLowerCase() + "-sum").html(severityMap[key])
+                                }
+                            }
+                        }
+
                         document.getElementById("text_filter").addEventListener("keyup", filterText);
-                        document.getElementById("impact").addEventListener("change", selectFilter);
-                        document.getElementById("severity").addEventListener("change", selectFilter);
-                        selectFilter();
+                        document.getElementById("filters").addEventListener("click", formChanged);
+                        $('#filters').submit(function(ev) {
+                            ev.preventDefault();
+                        });
+                        initCount();
                     }
-                    </script
+                    </script>
+                    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+                    <title> ''' + str(repository_name) + '''</title>
                 </head>
 <!-- 
 ''' + json.dumps({ 'meta': meta_info }, indent=2, sort_keys=True) + '''
 -->
                 <body>
-                <div class="controls left">
-                <span class="bold">Repository: ''' + str(repository_name) + '''</span>
-                </div>
-                <div class="controls">
-                <div class="column left">
-                <span class="bold">IMPACT</span>
-                <span class="red">HIGH: <span class="bold">''' + str(filtered_msgs_impact_count['HIGH']) + '''</span></span>
-                <span class="orange">MEDIUM: <span class="bold">''' + str(filtered_msgs_impact_count['MEDIUM']) + '''</span></span>
-                <span class="green">LOW: <span class="bold">''' + str(filtered_msgs_impact_count['LOW']) + '''</span></span>
-                <span> | </span>
-                <span class="bold">SEVERITY</span>
-                <span class="magenta">ERROR: <span class="bold">''' + str(filtered_msgs_severity_count['ERROR']) + '''</span></span>
-                <span class="red">HIGH: <span class="bold">''' + str(filtered_msgs_severity_count['HIGH']) + '''</span></span>
-                <span class="orange">WARNING: <span class="bold">''' + str(filtered_msgs_severity_count['WARNING']) + '''</span></span>
-                <span class="green">LOW: <span class="bold">''' + str(filtered_msgs_severity_count['LOW']) + '''</span></span>
-                </div>
-                <div class="column right">
-                <input type="text" id="text_filter" placeholder="Search..." title="Type in a name">
-                <span>IMPACT</span>
-                <select name="impact" id="impact">
-                    <option value="all" selected="selected" >All</option>
-                    <option value="high" >High</option>
-                    <option value="medium">Medium</option>
-                    <option value="low">Low</option>
-                </select>
-                <span>SEVERITY</span>
-                <select name="severity" id="severity">
-                    <option value="all" selected="selected" >All</option>
-                    <option value="error">Error</option>
-                    <option value="high" >High</option>
-                    <option value="warning">Warning</option>
-                    <option value="low">Low</option>
-                </select>
+                <div class="container-fluid">
+                <h2>''' + str(repository_name) + '''</h2>
+                <div class="row">
+                    <div class="col controls">
+                        <table class="table table-striped" id="summary">
+                            <tr><th>Level</th><th>Impact</th><th>Level</th><th>Severity</th></tr>
+                            <tr class=""><td><span class="badge badge-danger"><b>High</b></span></td><td id="impact-high-sum">0</td><td><span class="badge badge-danger"><b>Error</b></span></td><td id="severity-error-sum">0</td></tr>
+                            <tr class=""><td></td><td></td><td><span class="badge badge-danger"><b>High</b></span></td><td id="severity-high-sum">0</td></tr>
+                            <tr class=""><td><span class="badge badge-warning"><b>Medium</b></span></td><td id="impact-medium-sum">0</td><td><span class="badge badge-warning"><b>Warning</b></span></td><td id="severity-warning-sum">0</td></tr>
+                            <tr class=""><td><span class="badge badge-info"><b>Low</b></span></td><td id="impact-low-sum">0</td><td><span class="badge badge-info"><b>Low</b></span></td><td></td></tr>
+                        </table>
+                    </div>
+                    <div class="col controls filters">
+                        <form id="filters">
+                            <span class="fixed"><b>Impact</b>&nbsp;&nbsp;&nbsp;&nbsp;</span>
+                            <div class="form-check form-check-inline">
+                            <input class="form-check-input impact" data-checkbox="impact" type="checkbox" id="impact-chackebox-high" value="high" checked>
+                            <label class="form-check-label" for="impact-chackebox-high">High</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                            <input class="form-check-input impact" data-checkbox="impact" type="checkbox" id="impact-chackebox-medium" value="medium" checked>
+                            <label class="form-check-label" for="impact-chackebox-medium">Medium</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                            <input class="form-check-input impact" data-checkbox="impact" type="checkbox" id="impact-chackebox-low" value="low" checked>
+                            <label class="form-check-label" for="impact-chackebox-low">Low</label>
+                            </div>
+                            <br>
+                            <span class="fixed"><b>Severity</b>&nbsp;&nbsp;</span>
+                            <div class="form-check form-check-inline">
+                            <input class="form-check-input severity" data-checkbox="severity" type="checkbox" id="severity-chackebox-error" value="error" checked>
+                            <label class="form-check-label" for="severity-chackebox-error">Error</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                            <input class="form-check-input severity" data-checkbox="severity" type="checkbox" id="severity-chackebox-high" value="high" checked>
+                            <label class="form-check-label" for="severity-chackebox-high">High</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                            <input class="form-check-input severity" data-checkbox="severity" type="checkbox" id="severity-chackebox-warning" value="warning" checked>
+                            <label class="form-check-label" for="severity-chackebox-warning">Warning</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                            <input class="form-check-input severity" data-checkbox="severity" type="checkbox" id="severity-chackebox-low" value="low" checked>
+                            <label class="form-check-label" for="severity-chackebox-low">Low</label>
+                            </div>
+                            <div class="input-group mb-3">
+                            <div class="input-group-prepend">
+                                <button class="btn btn-outline-secondary" type="button">Search</button>
+                            </div>
+                            <input type="text" id="text_filter" class="form-control" placeholder="type text here..." aria-label="Search" aria-describedby="search">
+                            </div>
+                        </form>
+                    </div>
                 </div>
                 </div>
             ''' + self.get_report_body(filtered_msgs) + '''
