@@ -257,6 +257,8 @@ class Prospector2HTML:
                     <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
                     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
                     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+                    <link href="https://cdn.datatables.net/v/bs4/dt-1.13.6/datatables.min.css" rel="stylesheet">
+                    <script src="https://cdn.datatables.net/v/bs4/dt-1.13.6/datatables.min.js"></script>
                     <style>
                         body{ margin:0; background:whitesmoke; }
                         table {
@@ -471,6 +473,10 @@ class Prospector2HTML:
                             ev.preventDefault();
                         });
                         initCount();
+                        $("#info-table").DataTable({
+                            "ordering": true,
+                            "paging": false
+                        });
                     }
                     </script>
                     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
