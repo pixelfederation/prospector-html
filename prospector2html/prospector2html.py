@@ -324,6 +324,9 @@ class Prospector2HTML:
                         .container-fluid > h2 {
                             margin: 20px 20px 20px 20px;
                         }
+                        #info-table_wrapper {
+                            overflow: hidden;
+                        }
                     </style>
                     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/go.min.js"></script>
                     <script>
